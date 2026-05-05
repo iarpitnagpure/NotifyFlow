@@ -1,21 +1,19 @@
 {
-  "name": "api-gateway",
+  "name": "notification-service",
   "version": "1.0.0",
   "type": "module",
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "nodemon src/index.js"
+    "start": "nodemon index.js"
   },
+  "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "@grpc/grpc-js": "^1.14.3",
     "@grpc/proto-loader": "^0.8.0",
-    "cors": "^2.8.6",
     "dotenv": "^17.4.2",
-    "express": "^5.2.1",
-    "nodemon": "^3.1.14",
-    "redis": "^5.12.1"
+    "nodemon": "^3.1.14"
   }
 }
