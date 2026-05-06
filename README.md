@@ -1,104 +1,111 @@
 # 🚀 NotifyFlow
 
-A scalable, rate-limited, event-driven notification system built using Node.js, Redis, gRPC, and Kafka.
+A scalable, rate-limited notification system built using Node.js, Redis, and gRPC microservices.
 
 ---
 
 ## 🧠 Overview
 
-NotifyFlow is a backend system designed to handle high-throughput notification requests (Email/SMS) efficiently and reliably.
+NotifyFlow is a backend system designed to handle notification requests efficiently and reliably. 
 
-It demonstrates modern backend architecture patterns including:
+Currently implemented features:
 
-* API Gateway
-* Rate Limiting
-* gRPC-based microservices
-* Event-driven processing with Kafka
-* Asynchronous workers
-
----
-
-## ⚡ How It Works
-
-1. Client sends a notification request
-2. API Gateway validates request & applies rate limiting (Redis)
-3. Request is forwarded to internal services via gRPC
-4. Notification Service publishes event to Kafka
-5. Worker consumes event and processes notification
+* API Gateway with Express.js
+* Rate Limiting middleware using Redis
+* gRPC-based Notification Service
+* Health check endpoints
 
 ---
 
-## 🔁 Flow Diagram
+## ⚡ Current Architecture
 
 ```
 Client
   ↓
-API Gateway
+API Gateway (Express)
   ↓
-Redis (Rate Limiting)
+Rate Limiter (Redis Middleware)
   ↓
 gRPC Services
   ↓
-Kafka
-  ↓
-Worker
-  ↓
-Notification Sent
+Notification Service
 ```
 
 ---
 
 ## 🏗️ Tech Stack
 
-* Node.js (Backend Services)
-* Redis (Rate Limiting, Caching)
-* gRPC (Service-to-Service Communication)
-* Kafka (Event Streaming)
-* Docker (Containerization)
-
----
-
-## 🔧 Features
-
-* 🚦 Rate Limiting (per user/IP using Redis)
-* ⚡ High-performance gRPC communication
-* 🟠 Event-driven architecture using Kafka
-* 🧵 Asynchronous background processing
-* 🔁 Retry mechanism for failed jobs (optional)
-* 💀 Dead Letter Queue support (optional)
-* 📊 Logging & monitoring (extendable)
+* **Node.js** (Backend Services)
+* **Express.js** (API Gateway)
+* **Redis** (Rate Limiting)
+* **gRPC** (Service-to-Service Communication)
 
 ---
 
 ## 📁 Project Structure
 
 ```
-notifyflow/
+NotifyFlow/
 ├── api-gateway/
+│   ├── src/
+│   │   ├── index.js (Express server)
+│   │   ├── routes/
+│   │   │   ├── health.js
+│   │   │   └── notify.js
+│   │   ├── controllers/
+│   │   │   ├── healthController.js
+│   │   │   └── notifyController.js
+│   │   ├── middlewares/
+│   │   │   └── redisRateLimiter.js
+│   │   ├── services/
+│   │   │   └── grpcClient.js
+│   │   └── config/
+│   │       └── redis.js
+│   └── package.json
 ├── notification-service/
-├── user-service/
-├── worker-service/
+│   ├── index.js (gRPC server)
+│   └── package.json
 ├── proto/
-├── docker-compose.yml
+│   └── notification.proto (gRPC contracts)
+└── README.md
 ```
 
 ---
 
-## 🧪 API Example
+## 🔧 Implemented Features
+
+* ✅ Express API Gateway on port 3000
+* ✅ Health check endpoint (`GET /api/health`)
+* ✅ Rate limiting middleware using Redis
+* ✅ Notification endpoint (`POST /api/notify`)
+* ✅ gRPC service definition with proto files
+* ✅ gRPC Notification Service implementation
+
+---
+
+## 🧪 API Endpoints
+
+### Health Check
+
+```
+GET /api/health
+```
+
+---
 
 ### Send Notification
 
 ```
-POST /notify
+POST /api/notify
 ```
 
 **Request Body**
 
-```
+```json
 {
-  "userId": 1,
+  "userId": "user123",
   "type": "email",
-  "message": "Hello"
+  "message": "Hello, this is a notification"
 }
 ```
 
@@ -108,54 +115,96 @@ POST /notify
 
 ### Prerequisites
 
-* Docker & Docker Compose installed
+* Node.js (v18+)
+* Redis (running locally or via Docker)
 
 ---
 
-### Run the Project
+### Installation
 
-```
-docker-compose up --build
+1. Clone the repository
+2. Install dependencies for each service:
+
+```bash
+# API Gateway
+cd api-gateway
+npm install
+
+# Notification Service
+cd ../notification-service
+npm install
 ```
 
 ---
 
-### Services
+### Environment Variables
+
+Create `.env` files in both services:
+
+**api-gateway/.env**
+```
+APP_PORT=3000
+GRPC_HOST=localhost
+GRPC_PORT=50051
+REDIS_HOST=localhost
+REDIS_PORT=6379
+```
+
+**notification-service/.env**
+```
+GRPC_HOST=localhost
+GRPC_PORT=50051
+```
+
+---
+
+### Run Services
+
+```bash
+# API Gateway (runs on port 3000)
+cd api-gateway
+npm start
+
+# Notification Service (runs on port 50051)
+cd notification-service
+npm start
+```
+
+---
+
+### Services Running At
 
 * API Gateway → http://localhost:3000
-* Kafka → localhost:9092
 * Redis → localhost:6379
+* gRPC Notification Service → localhost:50051
 
 ---
 
 ## 🎯 Learning Objectives
 
-This project helps in understanding:
+This project demonstrates:
 
-* Distributed system design
-* Rate limiting strategies
-* Event-driven architecture
-* Microservices communication (gRPC)
-* Asynchronous job processing
-
----
-
-## 💬 Interview Pitch
-
-> NotifyFlow is a production-style backend system that demonstrates rate limiting with Redis, internal service communication using gRPC, and asynchronous event processing via Kafka.
+* API Gateway pattern
+* Rate limiting strategies with Redis
+* gRPC for service-to-service communication
+* Proto buffer service contracts
+* Middleware pattern in Express.js
 
 ---
 
 ## 📌 Future Enhancements
 
+* Kafka integration for event streaming
+* Worker service for async processing
+* User service for user management
 * Authentication & Authorization
-* Priority queues
-* Real email/SMS integration
+* Error handling and retry mechanisms
+* Logging & monitoring
+* Docker containerization
 * Observability (metrics, tracing)
-* Circuit breaker pattern
 
 ---
 
 ## 🧑‍💻 Author
 
-Your Name
+Arpit Nagpure

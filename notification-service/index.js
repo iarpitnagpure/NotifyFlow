@@ -56,8 +56,8 @@ server.addService(notificationPackage.NotificationService.service, {
 
 // Start server and bind to GRPCPORT
 server.bindAsync(
-    `${GRPCHOST}:${GRPCPORT}`,                                        // Listen on all interfaces
-    grpc.ServerCredentials.createInsecure(),                // No SSL (OK for local dev)
+    `${GRPCHOST}:${GRPCPORT}`,                                          // Listen on all interfaces
+    grpc.ServerCredentials.createInsecure(),                            // No SSL (OK for local dev)
     (err, GRPCPORT) => {
         if (err) {
             console.error("Server error:", err);
