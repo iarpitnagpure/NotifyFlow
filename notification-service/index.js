@@ -51,6 +51,13 @@ server.addService(notificationPackage.NotificationService.service, {
 
         // Send response back to client
         callback(null, { status: "Notification queued" });
+
+        // Simulate slow notification service to test gRPC timeout handling
+        // Delay response by 5 seconds (greater than gateway deadline)
+        // This should trigger DEADLINE_EXCEEDED error in API Gateway
+        // setTimeout(() => {
+        //     callback(null, { status: "Notification queued" });
+        // }, 5000);
     }
 });
 
