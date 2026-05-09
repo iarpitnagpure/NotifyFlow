@@ -24,11 +24,17 @@ Client
   ↓
 API Gateway (Express)
   ↓
-Rate Limiter (Redis Middleware)
+Idempotency Middleware
   ↓
-gRPC Services
+Rate Limiter (Redis)
+  ↓
+Controller
+  ↓
+gRPC Client
   ↓
 Notification Service
+  ↓
+Response → back through Gateway → Client
 ```
 
 ---
