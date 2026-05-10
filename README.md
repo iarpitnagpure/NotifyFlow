@@ -6,12 +6,15 @@ A scalable, rate-limited notification system built using Node.js, Redis, and gRP
 
 ## 🧠 Overview
 
-NotifyFlow is a backend system designed to handle notification requests efficiently and reliably. 
+NotifyFlow is a scalable, event-driven notification system built with Node.js microservices. It uses async job queuing (BullMQ) for reliable, non-blocking notification processing.
 
 Currently implemented features:
 
 * API Gateway with Express.js
 * Rate Limiting middleware using Redis
+* Idempotency & duplicate request prevention
+* Async job queue (BullMQ) for background processing
+* Notification Worker service for async job processing
 * gRPC-based Notification Service
 * Health check endpoints
 
@@ -20,21 +23,26 @@ Currently implemented features:
 ## ⚡ Current Architecture
 
 ```
-Client
+Client Request
   ↓
 API Gateway (Express)
   ↓
-Idempotency Middleware
+Idempotency Middleware (Redis cache)
   ↓
-Rate Limiter (Redis)
+Rate Limiter (Redis counter)
   ↓
 Controller
+  ↓
+BullMQ Queue (Redis)
+  ↓ [Async Processing]
+Notification Worker
   ↓
 gRPC Client
   ↓
 Notification Service
-  ↓
-Response → back through Gateway → Client
+
+Response to Client: ✅ Job Accepted (202 Accepted)
+→ Processing happens asynchronously in background
 ```
 
 ---
@@ -43,8 +51,10 @@ Response → back through Gateway → Client
 
 * **Node.js** (Backend Services)
 * **Express.js** (API Gateway)
-* **Redis** (Rate Limiting)
+* **BullMQ** (Job Queue for async processing)
+* **Redis** (Queue, Rate Limiting, Caching, Idempotency)
 * **gRPC** (Service-to-Service Communication)
+* **Protocol Buffers** (Service contracts)
 
 ---
 
@@ -66,14 +76,24 @@ NotifyFlow/
 │   │   │   └── redisRateLimiter.js (Request throttling)
 │   │   ├── services/
 │   │   │   └── grpcClient.js (gRPC client)
-│   │   └── config/
-│   │       └── redis.js (Redis connection)
+│   │   ├── queue/
+│   │   │   └── notificationQueue.js (BullMQ producer)
+│   │   ├── config/
+│   │   │   └── redis.js (Redis connection)
+│   │   └── index.js
 │   └── package.json
 ├── notification-service/
 │   ├── index.js (gRPC server)
 │   └── package.json
+├── notification-worker/
+│   ├── worker.js (BullMQ consumer - job processor)
+│   ├── services/
+│   │   └── grpcClient.js (gRPC client for worker)
+│   ├── .env
+│   └── package.json
 ├── proto/
 │   └── notification.proto (gRPC service contracts)
+├── .gitignore
 └── README.md
 ```
 
@@ -83,6 +103,7 @@ NotifyFlow/
 
 * ✅ **Express API Gateway** on port 3000
 * ✅ **Health check endpoint** (`GET /api/health`)
+* ✅ **Notification endpoint** (`POST /api/notify`)
 * ✅ **Idempotency Middleware** - Prevents duplicate request processing using `Idempotency-Key` header
   - Caches responses for 5 minutes (configurable)
   - Atomic request locking to prevent race conditions
@@ -91,14 +112,22 @@ NotifyFlow/
   - Configurable per-user or per-IP limiting
   - 5 requests per 60-second window (configurable)
   - Atomic counter operations for distributed safety
+* ✅ **Async Job Queue** using BullMQ
+  - Enqueue notification jobs from API Gateway
+  - Non-blocking request/response (returns 202 Accepted)
+  - Improves API responsiveness and scalability
+* ✅ **Notification Worker** - Async job processor
+  - Listens to BullMQ queue for notification jobs
+  - Automatic retry with exponential backoff (3 attempts)
+  - gRPC deadline enforcement (2-second timeout)
+  - Error handling and graceful job failure
   - Graceful fallback if Redis is unavailable
-* ✅ **Notification endpoint** (`POST /api/notify`)
+* ✅ **gRPC Error Handling** in Worker
+  - Deadline exceeded (timeout) → logs and retries
+  - Connection failures → logs and retries
+  - Max retry attempts with exponential backoff
 * ✅ **gRPC service definition** with proto files
 * ✅ **gRPC Notification Service** implementation on port 50051
-* ✅ **gRPC Error Handling** - Graceful error responses
-  - Deadline exceeded (timeout) → returns 503 Service Unavailable
-  - Connection failures → returns 500 Internal Server Error
-  - Proper error logging for debugging
 * ✅ **CORS support** for cross-origin requests
 * ✅ **Environment variable configuration** via `.env` files
 
@@ -130,14 +159,15 @@ POST /api/notify
 }
 ```
 
-**Response (Success)**
+**Response (Accepted - Job Queued)**
 
 ```json
 {
-  "success": true,
-  "message": "Notification sent successfully"
+  "jobId": "12345",
+  "message": "Notification job queued successfully"
 }
 ```
+Status Code: `202` (Accepted - job queued for async processing)
 
 **Response (Rate Limited)**
 
@@ -157,23 +187,14 @@ Status Code: `429`
 ```
 Status Code: `400`
 
-**Response (Service Timeout)**
-
-```json
-{
-  "error": "Notification service unavailable"
-}
-```
-Status Code: `503` (gRPC deadline exceeded - service didn't respond within 2 seconds)
-
 **Response (Service Error)**
 
 ```json
 {
-  "error": "Failed to process notification"
+  "error": "Failed to queue notification"
 }
 ```
-Status Code: `500` (gRPC connection failure or internal error)
+Status Code: `500` (Internal error - job queuing failed)
 
 **Headers (Optional)**
 
@@ -225,9 +246,10 @@ The notification endpoint processes requests through the following middleware ch
 curl -X GET http://localhost:3000/api/health
 ```
 
-### Test Notification Endpoint (Single Request)
+### Test Notification Endpoint (Async Job Queuing)
 
 ```bash
+# Request returns immediately with 202 Accepted
 curl -X POST http://localhost:3000/api/notify \
   -H "Content-Type: application/json" \
   -d '{
@@ -235,6 +257,29 @@ curl -X POST http://localhost:3000/api/notify \
     "type": "email",
     "message": "Test notification"
   }'
+
+# Response:
+# {
+#   "jobId": "12345",
+#   "message": "Notification job queued successfully"
+# }
+```
+
+The job is now queued and will be processed by the notification-worker service asynchronously.
+
+### Monitor Worker Processing
+
+Check the notification-worker logs to see job processing:
+
+```bash
+# Terminal 3: Run Notification Worker
+cd notification-worker
+npm start
+
+# You should see logs like:
+# Processing job: 12345
+# Calling gRPC Service for user123
+# Job completed successfully
 ```
 
 ### Test Idempotency
@@ -287,40 +332,43 @@ curl -X POST http://localhost:3000/api/notify \
   -d '{"userId": "user123"}'
 ```
 
-**gRPC Service Timeout (503)**
+**Job Queuing Failure (500)**
 
-Stop the notification service while making a request:
+If BullMQ queue fails to enqueue the job:
 
 ```bash
+# Stop Redis first to trigger queue failure
+redis-cli shutdown
+
 curl -X POST http://localhost:3000/api/notify \
   -H "Content-Type: application/json" \
   -d '{
     "userId": "user123",
     "type": "email",
-    "message": "Test timeout"
+    "message": "Test"
   }'
 ```
 
-Expected response after 2 seconds:
+Expected response:
 ```json
 {
-  "error": "Notification service unavailable"
+  "error": "Failed to queue notification"
 }
 ```
 
-**gRPC Service Unavailable (500)**
+**Worker Retry on gRPC Timeout**
 
-Configure wrong gRPC host/port in `.env` and make a request:
+Stop the notification-service while worker is processing:
 
 ```bash
-curl -X POST http://localhost:3000/api/notify \
-  -H "Content-Type: application/json" \
-  -d '{
-    "userId": "user123",
-    "type": "email",
-    "message": "Test unavailable"
-  }'
+# Terminal 2: Kill Notification Service (Ctrl+C)
+
+# Worker logs should show:
+# Worker Timeout: <error_message>
+# Retrying job... (attempt 2/3)
 ```
+
+The worker will automatically retry up to 3 times with exponential backoff.
 
 ---
 
@@ -346,13 +394,17 @@ npm install
 # Notification Service
 cd ../notification-service
 npm install
+
+# Notification Worker
+cd ../notification-worker
+npm install
 ```
 
 ---
 
 ### Environment Variables
 
-Create `.env` files in both services:
+Create `.env` files in all three services:
 
 **api-gateway/.env**
 ```
@@ -361,6 +413,8 @@ GRPC_HOST=localhost
 GRPC_PORT=50051
 REDIS_HOST=localhost
 REDIS_PORT=6379
+NOTIFICATION_WORKER_HOST=localhost
+NOTIFICATION_WORKER_PORT=6379
 ```
 
 **notification-service/.env**
@@ -369,17 +423,32 @@ GRPC_HOST=localhost
 GRPC_PORT=50051
 ```
 
+**notification-worker/.env**
+```
+GRPC_HOST=localhost
+GRPC_PORT=50051
+NOTIFICATION_WORKER_HOST=localhost
+NOTIFICATION_WORKER_PORT=6379
+```
+
 ---
 
 ### Run Services
 
 ```bash
-# API Gateway (runs on port 3000)
+# Terminal 1: Start Redis (if not already running)
+redis-server
+
+# Terminal 2: API Gateway (runs on port 3000)
 cd api-gateway
 npm start
 
-# Notification Service (runs on port 50051)
+# Terminal 3: Notification Service (runs on port 50051)
 cd notification-service
+npm start
+
+# Terminal 4: Notification Worker (async job processor)
+cd notification-worker
 npm start
 ```
 
@@ -390,6 +459,7 @@ npm start
 * API Gateway → http://localhost:3000
 * Redis → localhost:6379
 * gRPC Notification Service → localhost:50051
+* Notification Worker → Listens to Redis queue (no exposed port)
 
 ---
 
@@ -399,22 +469,29 @@ This project demonstrates:
 
 * API Gateway pattern
 * Rate limiting strategies with Redis
-* gRPC for service-to-service communication
+* gRPC for service-to-Service communication
 * Proto buffer service contracts
 * Middleware pattern in Express.js
+* **Async job queuing with BullMQ**
+* **Background worker pattern for non-blocking processing**
+* **Idempotency and duplicate request prevention**
+* **Exponential backoff retry strategies**
+* **Distributed system architecture with Redis communication**
 
 ---
 
 ## 📌 Future Enhancements
 
 * Kafka integration for event streaming
-* Worker service for async processing
 * User service for user management
 * Authentication & Authorization
-* Error handling and retry mechanisms
-* Logging & monitoring
+* Enhanced logging & monitoring (ELK stack)
 * Docker containerization
-* Observability (metrics, tracing)
+* Observability (metrics, tracing, APM)
+* Database integration for persistence
+* WebSocket support for real-time notifications
+* Message templating and personalization
+* Notification delivery status tracking
 
 ---
 
