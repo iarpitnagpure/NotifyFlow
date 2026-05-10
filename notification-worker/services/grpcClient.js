@@ -13,7 +13,7 @@ const __dirname = path.dirname(__filename);
 
 // Define path to proto file (gRPC contract)
 // This file contains service + message definitions
-const PROTO_PATH = path.join(__dirname, '../../../proto/notification.proto');
+const PROTO_PATH = path.join(__dirname, '../../proto/notification.proto');
 
 // Load proto file definition
 // This parses the .proto file into a usable JS object
@@ -25,8 +25,8 @@ const grpcObject = grpc.loadPackageDefinition(packageDef);
 // Create gRPC client instance
 // This acts like a "remote service caller"
 const grpcClient = new grpcObject.NotificationService(
-    `${GRPC_HOST}:${GRPC_PORT}`,                                       // Address of gRPC server
-    grpc.credentials.createInsecure()                                // No SSL (OK for local dev)
+    `${GRPC_HOST}:${GRPC_PORT}`,                                        // Address of gRPC server
+    grpc.credentials.createInsecure()                                   // No SSL (OK for local dev)
 );
 
 // Export client to use in routes/controllers

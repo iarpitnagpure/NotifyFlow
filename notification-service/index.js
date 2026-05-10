@@ -4,8 +4,8 @@ import grpc from '@grpc/grpc-js';
 import protoLoader from '@grpc/proto-loader';
 import 'dotenv/config';
 
-const GRPCHOST = process.env.GRPC_HOST;
-const GRPCPORT = process.env.GRPC_PORT;
+const GRPC_HOST = process.env.GRPC_HOST;
+const GRPC_PORT = process.env.GRPC_PORT;
 
 // In ES modules, __dirname is not available by default
 // So we recreate it using fileURLToPath
@@ -61,16 +61,16 @@ server.addService(notificationPackage.NotificationService.service, {
     }
 });
 
-// Start server and bind to GRPCPORT
+// Start server and bind to GRPC_PORT
 server.bindAsync(
-    `${GRPCHOST}:${GRPCPORT}`,                                          // Listen on all interfaces
+    `${GRPC_HOST}:${GRPC_PORT}`,                                          // Listen on all interfaces
     grpc.ServerCredentials.createInsecure(),                            // No SSL (OK for local dev)
-    (err, GRPCPORT) => {
+    (err, GRPC_PORT) => {
         if (err) {
             console.error("Server error:", err);
             return;
         }
 
-        console.log(`gRPC server running on GRPCPORT ${GRPCPORT}`);
+        console.log(`gRPC server running on GRPC_PORT ${GRPC_PORT}`);
     }
 );
