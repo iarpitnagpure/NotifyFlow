@@ -70,7 +70,7 @@ NotifyFlow/
 │   │   │   └── notify.js
 │   │   ├── controllers/
 │   │   │   ├── healthController.js
-│   │   │   └── notifyController.js
+│   │   │   └── notificationController.js
 │   │   ├── middlewares/
 │   │   │   ├── idempotency.js (Duplicate request handling)
 │   │   │   └── redisRateLimiter.js (Request throttling)
@@ -103,7 +103,12 @@ NotifyFlow/
 
 * ✅ **Express API Gateway** on port 3000
 * ✅ **Health check endpoint** (`GET /api/health`)
-* ✅ **Notification endpoint** (`POST /api/notify`)
+* ✅ **Notification endpoint** (`POST /api/notify`) - Enqueue async jobs
+* ✅ **Job Status endpoint** (`GET /api/notify/status/:notificationId`) - Poll job progress
+  - Track job state: waiting, active, completed, failed
+  - Returns job result on success
+  - Returns error details on failure
+  - 404 for non-existent job IDs
 * ✅ **Idempotency Middleware** - Prevents duplicate request processing using `Idempotency-Key` header
   - Caches responses for 5 minutes (configurable)
   - Atomic request locking to prevent race conditions
@@ -204,7 +209,74 @@ Idempotency-Key: <unique-key>
 Use this header to make the request idempotent. Subsequent requests with the same key within 5 minutes will return the cached response.
 
 ---
+### Get Notification Status
 
+```
+GET /api/notify/status/:notificationId
+```
+
+Track the status of an async notification job. Use the `jobId` returned from the POST request to poll the job status.
+
+**Path Parameters**
+
+- `notificationId` (required): The job ID returned from the POST `/api/notify` request
+
+**Response (Job Waiting in Queue)**
+
+```json
+{
+  "status": "waiting",
+  "result": null,
+  "error": null
+}
+```
+Status Code: `200`
+
+**Response (Job Currently Processing)**
+
+```json
+{
+  "status": "active",
+  "result": null,
+  "error": null
+}
+```
+Status Code: `200`
+
+**Response (Job Completed Successfully)**
+
+```json
+{
+  "status": "completed",
+  "result": {
+    "message": "Notification queued"
+  },
+  "error": null
+}
+```
+Status Code: `200`
+
+**Response (Job Failed After All Retries)**
+
+```json
+{
+  "status": "failed",
+  "result": null,
+  "error": "4 DEADLINE_EXCEEDED: Deadline exceeded after 2.005s,LB pick: 0.001s,remote_addr=0.0.0.0:50051"
+}
+```
+Status Code: `200`
+
+**Response (Job Not Found)**
+
+```json
+{
+  "error": "Job not found"
+}
+```
+Status Code: `404` (Job ID doesn't exist or has expired from queue)
+
+---
 ## � Middleware Pipeline
 
 The notification endpoint processes requests through the following middleware chain:
@@ -280,6 +352,55 @@ npm start
 # Processing job: 12345
 # Calling gRPC Service for user123
 # Job completed successfully
+```
+
+### Test Job Status Polling
+
+Use the job ID returned from the POST request to poll the job status:
+
+```bash
+# 1. Send notification request
+JOB_ID=$(curl -X POST http://localhost:3000/api/notify \
+  -H "Content-Type: application/json" \
+  -d '{
+    "userId": "user123",
+    "type": "email",
+    "message": "Test notification"
+  }' | jq -r '.jobId')
+
+echo "Job ID: $JOB_ID"
+
+# 2. Poll job status (should show "waiting" initially)
+curl -X GET "http://localhost:3000/api/notify/status/$JOB_ID"
+
+# Response:
+# {
+#   "status": "waiting",
+#   "result": null,
+#   "error": null
+# }
+
+# 3. After 2-3 seconds, poll again (should show "completed")
+sleep 3
+curl -X GET "http://localhost:3000/api/notify/status/$JOB_ID"
+
+# Response:
+# {
+#   "status": "completed",
+#   "result": {
+#     "success": true,
+#     "message": "Notification sent successfully"
+#   },
+#   "error": null
+# }
+
+# 4. Test non-existent job
+curl -X GET "http://localhost:3000/api/notify/status/invalid-job-id"
+
+# Response: 404
+# {
+#   "error": "Job not found"
+# }
 ```
 
 ### Test Idempotency
@@ -491,7 +612,6 @@ This project demonstrates:
 * Database integration for persistence
 * WebSocket support for real-time notifications
 * Message templating and personalization
-* Notification delivery status tracking
 
 ---
 

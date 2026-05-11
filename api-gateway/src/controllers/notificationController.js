@@ -2,7 +2,7 @@ import grpc from "@grpc/grpc-js";
 import grpcClient from "../services/grpcClient.js";
 import notificationQueue from "../queue/notificationQueue.js";
 
-export const notifyController = async (req, res) => {
+export const notificationController = async (req, res) => {
     // 1. Extract request payload from client
     const { userId, type, message } = req.body;
 

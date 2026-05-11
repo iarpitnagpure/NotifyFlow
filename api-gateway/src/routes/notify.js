@@ -6,9 +6,10 @@
 //   → goes to rate limiter
 
 import { Router } from 'express';
-import { notifyController } from '../controllers/notifyController.js';
+import { notificationController } from '../controllers/notificationController.js';
 import redisRateLimiter from '../middlewares/redisRateLimiter.js';
 import idempotency from '../middlewares/idempotency.js';
+import notificationStatusController from '../controllers/notificationStatusController.js';
 
 const notifyRouter = Router();
 
@@ -16,7 +17,12 @@ notifyRouter.post(
     '/',
     idempotency,
     redisRateLimiter,
-    notifyController
+    notificationController
+);
+
+notifyRouter.get(
+    '/status/:notificationId',
+    notificationStatusController
 );
 
 export default notifyRouter;
