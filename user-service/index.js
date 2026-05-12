@@ -4,8 +4,8 @@ import grpc from '@grpc/grpc-js';
 import protoLoader from '@grpc/proto-loader';
 import 'dotenv/config';
 
-const NOTIFICATION_SERVICE_GRPC_HOST = process.env.NOTIFICATION_SERVICE_GRPC_HOST;
-const NOTIFICATION_SERVICE_GRPC_PORT = process.env.NOTIFICATION_SERVICE_GRPC_PORT;
+const USER_SERVICE_GRPC_HOST = process.env.USER_SERVICE_GRPC_HOST;
+const USER_SERVICE_GRPC_PORT = process.env.USER_SERVICE_GRPC_PORT;
 
 // In ES modules, __dirname is not available by default
 // So we recreate it using fileURLToPath
@@ -14,7 +14,7 @@ const __dirname = path.dirname(__filename);
 
 // Define path to proto file (gRPC contract)
 // This file contains service + message definitions
-const PROTO_PATH = path.join(__dirname, '../proto/notification.proto');
+const PROTO_PATH = path.join(__dirname, '../proto/user.proto');
 
 // Load proto file (defines service + messages)
 const packageDef = protoLoader.loadSync(PROTO_PATH, {
@@ -29,48 +29,59 @@ const packageDef = protoLoader.loadSync(PROTO_PATH, {
 const grpcObject = grpc.loadPackageDefinition(packageDef);
 
 // If you had `package xyz;` in proto, you'd access like:
-// grpcObject.xyz.NotificationService
-const notificationPackage = grpcObject;
+// grpcObject.xyz.UserService
+const userPackage = grpcObject;
 
 // Create gRPC server instance
 const server = new grpc.Server();
 
 // Register service + its implementation
-server.addService(notificationPackage.NotificationService.service, {
+server.addService(userPackage.UserService.service, {
 
-    // This function runs when client calls SendNotification
-    SendNotification: (call, callback) => {
+    // This function runs when client calls GetUser
+    GetUser: (call, callback) => {
 
         // Extract request data from client
-        const { userId, type, message } = call.request;
+        const { userId } = call.request;
 
         // Log received request (for debugging)
-        console.log("Received:", userId, type, message);
-
-        // TODO: Later → push to Kafka instead of just logging
+        console.log("Received:", userId);
 
         // Send response back to client
-        callback(null, { status: "Notification queued" });
+        // TODO: Handle reponse by checking userId from MongoDB
+        callback(null, {
+            "exists": true,
+            "userId": userId,
+            "email": "test@example.com",
+            "phone": "9999999999",
+            "preferredChannel": "email"
+        });
 
-        // Simulate slow notification service to test gRPC timeout handling
+        // Simulate slow user service to test gRPC timeout handling
         // Delay response by 5 seconds (greater than gateway deadline)
         // This should trigger DEADLINE_EXCEEDED error in API Gateway
         // setTimeout(() => {
-        //     callback(null, { status: "Notification queued" });
+        //     callback(null, {
+        //         "exists": true,
+        //         "userId": userId,
+        //         "email": "test@example.com",
+        //         "phone": "9999999999",
+        //         "preferredChannel": "email"
+        //     });
         // }, 5000);
     }
 });
 
-// Start server and bind to NOTIFICATION_SERVICE_GRPC_PORT
+// Start server and bind to USER_SERVICE_GRPC_PORT
 server.bindAsync(
-    `${NOTIFICATION_SERVICE_GRPC_HOST}:${NOTIFICATION_SERVICE_GRPC_PORT}`,                                          // Listen on all interfaces
+    `${USER_SERVICE_GRPC_HOST}:${USER_SERVICE_GRPC_PORT}`,              // Listen on all interfaces
     grpc.ServerCredentials.createInsecure(),                            // No SSL (OK for local dev)
-    (err, NOTIFICATION_SERVICE_GRPC_PORT) => {
+    (err, USER_SERVICE_GRPC_PORT) => {
         if (err) {
             console.error("Server error:", err);
             return;
         }
 
-        console.log(`gRPC server running on NOTIFICATION_SERVICE_GRPC_PORT ${NOTIFICATION_SERVICE_GRPC_PORT}`);
+        console.log(`gRPC server running on USER_SERVICE_GRPC_PORT ${USER_SERVICE_GRPC_PORT}`);
     }
 );

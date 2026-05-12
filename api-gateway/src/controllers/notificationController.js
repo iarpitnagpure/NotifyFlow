@@ -1,5 +1,5 @@
 import grpc from "@grpc/grpc-js";
-import grpcClient from "../services/grpcClient.js";
+// import notificationGrpcClient from "../services/notificationGrpcClient.js";
 import notificationQueue from "../queue/notificationQueue.js";
 
 export const notificationController = async (req, res) => {
@@ -55,7 +55,7 @@ export const notificationController = async (req, res) => {
     // deadline.setSeconds(deadline.getSeconds() + 2);
 
     // // 4. Call gRPC Notification Service
-    // grpcClient.SendNotification(
+    // notificationGrpcClient.SendNotification(
     //     { userId, type, message },                  // request payload
 
     //     { deadline },                               // gRPC timeout: fail request if no response within specified time

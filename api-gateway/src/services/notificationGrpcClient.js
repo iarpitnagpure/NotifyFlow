@@ -3,8 +3,8 @@ import path from 'path';
 import grpc from '@grpc/grpc-js';
 import protoLoader from '@grpc/proto-loader';
 
-const GRPC_HOST = process.env.GRPC_HOST;
-const GRPC_PORT = process.env.GRPC_PORT
+const NOTIFICATION_SERVICE_GRPC_HOST = process.env.NOTIFICATION_SERVICE_GRPC_HOST;
+const NOTIFICATION_SERVICE_GRPC_PORT = process.env.NOTIFICATION_SERVICE_GRPC_PORT
 
 // In ES modules, __dirname is not available by default
 // So we recreate it using fileURLToPath
@@ -24,10 +24,10 @@ const grpcObject = grpc.loadPackageDefinition(packageDef);
 
 // Create gRPC client instance
 // This acts like a "remote service caller"
-const grpcClient = new grpcObject.NotificationService(
-    `${GRPC_HOST}:${GRPC_PORT}`,                                       // Address of gRPC server
-    grpc.credentials.createInsecure()                                // No SSL (OK for local dev)
+const notificationGrpcClient = new grpcObject.NotificationService(
+    `${NOTIFICATION_SERVICE_GRPC_HOST}:${NOTIFICATION_SERVICE_GRPC_PORT}`,      // Address of gRPC server
+    grpc.credentials.createInsecure()                                           // No SSL (OK for local dev)
 );
 
 // Export client to use in routes/controllers
-export default grpcClient;
+export default notificationGrpcClient;

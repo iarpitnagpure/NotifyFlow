@@ -16,7 +16,9 @@ Currently implemented features:
 * Async job queue (BullMQ) for background processing
 * Notification Worker service for async job processing
 * gRPC-based Notification Service
+* gRPC-based User Service for user management
 * Health check endpoints
+* User endpoints for user lookup
 
 ---
 
@@ -67,10 +69,12 @@ NotifyFlow/
 │   │   ├── index.js (Express server)
 │   │   ├── routes/
 │   │   │   ├── health.js
-│   │   │   └── notify.js
+│   │   │   ├── notify.js
+│   │   │   └── user.js
 │   │   ├── controllers/
 │   │   │   ├── healthController.js
-│   │   │   └── notificationController.js
+│   │   │   ├── notifyController.js
+│   │   │   └── userController.js
 │   │   ├── middlewares/
 │   │   │   ├── idempotency.js (Duplicate request handling)
 │   │   │   └── redisRateLimiter.js (Request throttling)
@@ -85,6 +89,9 @@ NotifyFlow/
 ├── notification-service/
 │   ├── index.js (gRPC server)
 │   └── package.json
+├── user-service/
+│   ├── index.js (gRPC User Service server)
+│   └── package.json
 ├── notification-worker/
 │   ├── worker.js (BullMQ consumer - job processor)
 │   ├── services/
@@ -92,7 +99,8 @@ NotifyFlow/
 │   ├── .env
 │   └── package.json
 ├── proto/
-│   └── notification.proto (gRPC service contracts)
+│   ├── notification.proto (Notification service contract)
+│   └── user.proto (User service contract)
 ├── .gitignore
 └── README.md
 ```
@@ -109,6 +117,9 @@ NotifyFlow/
   - Returns job result on success
   - Returns error details on failure
   - 404 for non-existent job IDs
+* ✅ **User endpoint** (`GET /api/user/:userId`) - Lookup user information
+  - Returns user details: email, phone, preferred channel
+  - 404 for non-existent users
 * ✅ **Idempotency Middleware** - Prevents duplicate request processing using `Idempotency-Key` header
   - Caches responses for 5 minutes (configurable)
   - Atomic request locking to prevent race conditions
@@ -131,8 +142,9 @@ NotifyFlow/
   - Deadline exceeded (timeout) → logs and retries
   - Connection failures → logs and retries
   - Max retry attempts with exponential backoff
-* ✅ **gRPC service definition** with proto files
+* ✅ **gRPC service definitions** with proto files
 * ✅ **gRPC Notification Service** implementation on port 50051
+* ✅ **gRPC User Service** implementation on port 50052
 * ✅ **CORS support** for cross-origin requests
 * ✅ **Environment variable configuration** via `.env` files
 
@@ -147,7 +159,50 @@ GET /api/health
 ```
 
 ---
+### Get User
 
+```
+GET /api/user/:userId
+```
+
+Retrieve user information from the User Service via gRPC.
+
+**Path Parameters**
+
+- `userId` (required): The unique identifier for the user
+
+**Response (User Found)**
+
+```json
+{
+  "exists": true,
+  "userId": "user123",
+  "email": "user123@example.com",
+  "phone": "+1234567890",
+  "preferredChannel": "email"
+}
+```
+Status Code: `200`
+
+**Response (User Not Found)**
+
+```json
+{
+  "error": "User not found"
+}
+```
+Status Code: `404`
+
+**Response (Rate Limited)**
+
+```json
+{
+  "error": "Too many requests"
+}
+```
+Status Code: `429`
+
+---
 ### Send Notification
 
 ```
@@ -310,189 +365,6 @@ The notification endpoint processes requests through the following middleware ch
 
 ---
 
-## 🧪 Testing the API
-
-### Test Health Endpoint
-
-```bash
-curl -X GET http://localhost:3000/api/health
-```
-
-### Test Notification Endpoint (Async Job Queuing)
-
-```bash
-# Request returns immediately with 202 Accepted
-curl -X POST http://localhost:3000/api/notify \
-  -H "Content-Type: application/json" \
-  -d '{
-    "userId": "user123",
-    "type": "email",
-    "message": "Test notification"
-  }'
-
-# Response:
-# {
-#   "jobId": "12345",
-#   "message": "Notification job queued successfully"
-# }
-```
-
-The job is now queued and will be processed by the notification-worker service asynchronously.
-
-### Monitor Worker Processing
-
-Check the notification-worker logs to see job processing:
-
-```bash
-# Terminal 3: Run Notification Worker
-cd notification-worker
-npm start
-
-# You should see logs like:
-# Processing job: 12345
-# Calling gRPC Service for user123
-# Job completed successfully
-```
-
-### Test Job Status Polling
-
-Use the job ID returned from the POST request to poll the job status:
-
-```bash
-# 1. Send notification request
-JOB_ID=$(curl -X POST http://localhost:3000/api/notify \
-  -H "Content-Type: application/json" \
-  -d '{
-    "userId": "user123",
-    "type": "email",
-    "message": "Test notification"
-  }' | jq -r '.jobId')
-
-echo "Job ID: $JOB_ID"
-
-# 2. Poll job status (should show "waiting" initially)
-curl -X GET "http://localhost:3000/api/notify/status/$JOB_ID"
-
-# Response:
-# {
-#   "status": "waiting",
-#   "result": null,
-#   "error": null
-# }
-
-# 3. After 2-3 seconds, poll again (should show "completed")
-sleep 3
-curl -X GET "http://localhost:3000/api/notify/status/$JOB_ID"
-
-# Response:
-# {
-#   "status": "completed",
-#   "result": {
-#     "success": true,
-#     "message": "Notification sent successfully"
-#   },
-#   "error": null
-# }
-
-# 4. Test non-existent job
-curl -X GET "http://localhost:3000/api/notify/status/invalid-job-id"
-
-# Response: 404
-# {
-#   "error": "Job not found"
-# }
-```
-
-### Test Idempotency
-
-```bash
-# First request - processes normally
-curl -X POST http://localhost:3000/api/notify \
-  -H "Content-Type: application/json" \
-  -H "Idempotency-Key: test-key-001" \
-  -d '{
-    "userId": "user123",
-    "type": "email",
-    "message": "Test notification"
-  }'
-
-# Second request with same key - returns cached response instantly
-curl -X POST http://localhost:3000/api/notify \
-  -H "Content-Type: application/json" \
-  -H "Idempotency-Key: test-key-001" \
-  -d '{
-    "userId": "user123",
-    "type": "email",
-    "message": "Test notification"
-  }'
-```
-
-### Test Rate Limiting
-
-```bash
-# Make 5 requests (should all succeed)
-for i in {1..5}; do
-  curl -X POST http://localhost:3000/api/notify \
-    -H "Content-Type: application/json" \
-    -d "{\"userId\": \"user456\", \"type\": \"sms\", \"message\": \"Test $i\"}"
-done
-
-# 6th request (should be rate limited - 429 response)
-curl -X POST http://localhost:3000/api/notify \
-  -H "Content-Type: application/json" \
-  -d '{"userId": "user456", "type": "sms", "message": "Test 6"}'
-```
-
-### Test Error Handling
-
-**Missing Required Fields (400)**
-
-```bash
-curl -X POST http://localhost:3000/api/notify \
-  -H "Content-Type: application/json" \
-  -d '{"userId": "user123"}'
-```
-
-**Job Queuing Failure (500)**
-
-If BullMQ queue fails to enqueue the job:
-
-```bash
-# Stop Redis first to trigger queue failure
-redis-cli shutdown
-
-curl -X POST http://localhost:3000/api/notify \
-  -H "Content-Type: application/json" \
-  -d '{
-    "userId": "user123",
-    "type": "email",
-    "message": "Test"
-  }'
-```
-
-Expected response:
-```json
-{
-  "error": "Failed to queue notification"
-}
-```
-
-**Worker Retry on gRPC Timeout**
-
-Stop the notification-service while worker is processing:
-
-```bash
-# Terminal 2: Kill Notification Service (Ctrl+C)
-
-# Worker logs should show:
-# Worker Timeout: <error_message>
-# Retrying job... (attempt 2/3)
-```
-
-The worker will automatically retry up to 3 times with exponential backoff.
-
----
-
 ## 🚀 Getting Started
 
 ### Prerequisites
@@ -512,6 +384,10 @@ The worker will automatically retry up to 3 times with exponential backoff.
 cd api-gateway
 npm install
 
+# User Service
+cd ../user-service
+npm install
+
 # Notification Service
 cd ../notification-service
 npm install
@@ -525,17 +401,25 @@ npm install
 
 ### Environment Variables
 
-Create `.env` files in all three services:
+Create `.env` files in all services:
 
 **api-gateway/.env**
 ```
 APP_PORT=3000
 GRPC_HOST=localhost
 GRPC_PORT=50051
+USER_SERVICE_GRPC_HOST=localhost
+USER_SERVICE_GRPC_PORT=50052
 REDIS_HOST=localhost
 REDIS_PORT=6379
 NOTIFICATION_WORKER_HOST=localhost
 NOTIFICATION_WORKER_PORT=6379
+```
+
+**user-service/.env**
+```
+USER_SERVICE_GRPC_HOST=localhost
+USER_SERVICE_GRPC_PORT=50052
 ```
 
 **notification-service/.env**
@@ -564,11 +448,15 @@ redis-server
 cd api-gateway
 npm start
 
-# Terminal 3: Notification Service (runs on port 50051)
+# Terminal 3: User Service (runs on port 50052)
+cd user-service
+npm start
+
+# Terminal 4: Notification Service (runs on port 50051)
 cd notification-service
 npm start
 
-# Terminal 4: Notification Worker (async job processor)
+# Terminal 5: Notification Worker (async job processor)
 cd notification-worker
 npm start
 ```
@@ -579,6 +467,7 @@ npm start
 
 * API Gateway → http://localhost:3000
 * Redis → localhost:6379
+* gRPC User Service → localhost:50052
 * gRPC Notification Service → localhost:50051
 * Notification Worker → Listens to Redis queue (no exposed port)
 
@@ -604,14 +493,11 @@ This project demonstrates:
 ## 📌 Future Enhancements
 
 * Kafka integration for event streaming
-* User service for user management
 * Authentication & Authorization
-* Enhanced logging & monitoring (ELK stack)
+* Error handling and retry mechanisms
+* Logging & monitoring
 * Docker containerization
-* Observability (metrics, tracing, APM)
-* Database integration for persistence
-* WebSocket support for real-time notifications
-* Message templating and personalization
+* Observability (metrics, tracing)
 
 ---
 

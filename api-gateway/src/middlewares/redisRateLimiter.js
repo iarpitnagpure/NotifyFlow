@@ -28,7 +28,7 @@ const REQUEST_TIMEOUT = 60;                 // Time window in seconds
 const redisRateLimiter = async (req, res, next) => {
     try {
         // Identify user (prefer userId, fallback to IP)
-        const userId = req.body.userId || req.ip;
+        const userId = req.body?.userId || req.params?.userId || req.ip;
 
         // Redis key for tracking request count per user
         const key = `rate:${userId}`;
