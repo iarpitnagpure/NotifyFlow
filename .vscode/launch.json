@@ -1,0 +1,48 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "API Gateway",
+            "type": "node",
+            "request": "launch",
+            "program": "${workspaceFolder}/api-gateway/src/index.js",
+            "envFile": "${workspaceFolder}/api-gateway/.env",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "User Service",
+            "type": "node",
+            "request": "launch",
+            "program": "${workspaceFolder}/user-service/index.js",
+            "envFile": "${workspaceFolder}/user-service/.env",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Notification Service",
+            "type": "node",
+            "request": "launch",
+            "program": "${workspaceFolder}/notification-service/index.js",
+            "envFile": "${workspaceFolder}/notification-service/.env",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Notification Worker",
+            "type": "node",
+            "request": "launch",
+            "program": "${workspaceFolder}/notification-worker/worker.js",
+            "envFile": "${workspaceFolder}/notification-worker/.env",
+            "console": "integratedTerminal"
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Run All Services",
+            "configurations": [
+                "API Gateway",
+                "User Service",
+                "Notification Service",
+                "Notification Worker"
+            ]
+        }
+    ]
+}

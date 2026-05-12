@@ -1,3 +1,4 @@
+import grpc from "@grpc/grpc-js";
 import userGrpcClient from "../services/userGrpcClient.js";
 
 const userController = (req, res) => {
