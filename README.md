@@ -4,59 +4,18 @@ A scalable, rate-limited notification system built using Node.js, Redis, and gRP
 
 ---
 
-## 🧠 Overview
+## ✅ Implemented Features
 
-NotifyFlow is a scalable, event-driven notification system built with Node.js microservices. It uses async job queuing (BullMQ) for reliable, non-blocking notification processing.
-
-Currently implemented features:
-
-* API Gateway with Express.js
-* Rate Limiting middleware using Redis
-* Idempotency & duplicate request prevention
-* Async job queue (BullMQ) for background processing
-* Notification Worker service for async job processing
-* gRPC-based Notification Service
-* gRPC-based User Service for user management
-* Health check endpoints
-* User endpoints for user lookup
-
----
-
-## ⚡ Current Architecture
-
-```
-Client Request
-  ↓
-API Gateway (Express)
-  ↓
-Idempotency Middleware (Redis cache)
-  ↓
-Rate Limiter (Redis counter)
-  ↓
-Controller
-  ↓
-BullMQ Queue (Redis)
-  ↓ [Async Processing]
-Notification Worker
-  ↓
-gRPC Client
-  ↓
-Notification Service
-
-Response to Client: ✅ Job Accepted (202 Accepted)
-→ Processing happens asynchronously in background
-```
-
----
-
-## 🏗️ Tech Stack
-
-* **Node.js** (Backend Services)
-* **Express.js** (API Gateway)
-* **BullMQ** (Job Queue for async processing)
-* **Redis** (Queue, Rate Limiting, Caching, Idempotency)
-* **gRPC** (Service-to-Service Communication)
-* **Protocol Buffers** (Service contracts)
+* **API Gateway** - Express.js REST API with request routing
+* **Health Check Endpoints** - Service health monitoring
+* **Notification Sending** - Async job queue (BullMQ) for non-blocking notification processing
+* **Notification Status Tracking** - Real-time job status monitoring
+* **User Lookup** - gRPC-based user management service
+* **Rate Limiting** - Redis-based request throttling middleware
+* **Idempotency** - Duplicate request prevention with Redis caching
+* **Request ID Tracking** - Correlation IDs for request logging
+* **Notification Worker** - Background job processor for async task handling
+* **gRPC Services** - Service-to-service communication (Notification & User services)
 
 ---
 
@@ -66,38 +25,45 @@ Response to Client: ✅ Job Accepted (202 Accepted)
 NotifyFlow/
 ├── api-gateway/
 │   ├── src/
-│   │   ├── index.js (Express server)
+│   │   ├── index.js                           # Express server entry point
 │   │   ├── routes/
-│   │   │   ├── health.js
-│   │   │   ├── notify.js
-│   │   │   └── user.js
+│   │   │   ├── health.js                      # Health check routes
+│   │   │   ├── notify.js                      # Notification endpoints
+│   │   │   └── user.js                        # User lookup endpoints
 │   │   ├── controllers/
-│   │   │   ├── healthController.js
-│   │   │   ├── notifyController.js
-│   │   │   └── userController.js
+│   │   │   ├── healthController.js            # Health check logic
+│   │   │   ├── notificationController.js      # Notification handler (BullMQ producer)
+│   │   │   ├── notificationStatusController.js # Job status retrieval
+│   │   │   └── userController.js              # User gRPC client caller
 │   │   ├── middlewares/
-│   │   │   ├── idempotency.js (Duplicate request handling)
-│   │   │   └── redisRateLimiter.js (Request throttling)
+│   │   │   ├── idempotency.js                 # Duplicate request prevention
+│   │   │   ├── redisRateLimiter.js            # Request rate limiting
+│   │   │   └── requestId.js                   # Request correlation IDs
 │   │   ├── services/
-│   │   │   └── grpcClient.js (gRPC client)
+│   │   │   ├── notificationGrpcClient.js      # Notification service gRPC client
+│   │   │   └── userGrpcClient.js              # User service gRPC client
 │   │   ├── queue/
-│   │   │   └── notificationQueue.js (BullMQ producer)
-│   │   ├── config/
-│   │   │   └── redis.js (Redis connection)
-│   │   └── index.js
+│   │   │   └── notificationQueue.js           # BullMQ job queue producer
+│   │   └── config/
+│   │       ├── logger.js                      # Logging configuration
+│   │       └── redis.js                       # Redis connection
 │   └── package.json
 ├── notification-service/
-│   ├── index.js (gRPC server)
+│   ├── index.js                               # gRPC Notification Service server
 │   └── package.json
 ├── user-service/
-│   ├── index.js (gRPC User Service server)
+│   ├── index.js                               # gRPC User Service server
 │   └── package.json
 ├── notification-worker/
-│   ├── worker.js (BullMQ consumer - job processor)
+│   ├── worker.js                              # BullMQ job consumer/processor
 │   ├── services/
-│   │   └── grpcClient.js (gRPC client for worker)
-│   ├── .env
+│   │   └── grpcClient.js                      # gRPC client for worker
 │   └── package.json
+├── proto/
+│   ├── notification.proto                     # Notification service schema
+│   └── user.proto                             # User service schema
+├── package.json
+└── README.md
 ├── proto/
 │   ├── notification.proto (Notification service contract)
 │   └── user.proto (User service contract)
