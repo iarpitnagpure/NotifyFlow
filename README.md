@@ -62,10 +62,6 @@ NotifyFlow/
 ├── proto/
 │   ├── notification.proto                     # Notification service schema
 │   └── user.proto                             # User service schema
-└── README.md
-├── proto/
-│   ├── notification.proto (Notification service contract)
-│   └── user.proto (User service contract)
 ├── .gitignore
 └── README.md
 ```
