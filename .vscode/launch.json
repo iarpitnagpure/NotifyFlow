@@ -5,7 +5,12 @@
             "name": "API Gateway",
             "type": "node",
             "request": "launch",
-            "program": "${workspaceFolder}/api-gateway/src/index.js",
+            "runtimeExecutable": "npm",
+            "runtimeArgs": [
+                "run",
+                "dev"
+            ],
+            "cwd": "${workspaceFolder}/api-gateway",
             "envFile": "${workspaceFolder}/api-gateway/.env",
             "console": "integratedTerminal"
         },
@@ -13,7 +18,12 @@
             "name": "User Service",
             "type": "node",
             "request": "launch",
-            "program": "${workspaceFolder}/user-service/index.js",
+            "runtimeExecutable": "npm",
+            "runtimeArgs": [
+                "run",
+                "dev"
+            ],
+            "cwd": "${workspaceFolder}/user-service",
             "envFile": "${workspaceFolder}/user-service/.env",
             "console": "integratedTerminal"
         },
@@ -21,7 +31,12 @@
             "name": "Notification Service",
             "type": "node",
             "request": "launch",
-            "program": "${workspaceFolder}/notification-service/index.js",
+            "runtimeExecutable": "npm",
+            "runtimeArgs": [
+                "run",
+                "dev"
+            ],
+            "cwd": "${workspaceFolder}/notification-service",
             "envFile": "${workspaceFolder}/notification-service/.env",
             "console": "integratedTerminal"
         },
@@ -29,7 +44,12 @@
             "name": "Notification Worker",
             "type": "node",
             "request": "launch",
-            "program": "${workspaceFolder}/notification-worker/worker.js",
+            "runtimeExecutable": "npm",
+            "runtimeArgs": [
+                "run",
+                "dev"
+            ],
+            "cwd": "${workspaceFolder}/notification-worker",
             "envFile": "${workspaceFolder}/notification-worker/.env",
             "console": "integratedTerminal"
         }

@@ -1,9 +1,15 @@
 import grpc from "@grpc/grpc-js";
 import userGrpcClient from "../services/userGrpcClient.js";
+import logger from "../config/logger.js";
 
 const userController = (req, res) => {
     // 1. Extract request payload from client
     const { userId } = req.params;
+
+    logger.info(
+        { requestId: req.requestId, userId },
+        "Received user request"
+    );
 
     // 2. Basic validation (reject bad requests early)
     if (!userId) {
@@ -36,7 +42,10 @@ const userController = (req, res) => {
 
                 // Deadline exceeded → service is slow (did not respond in time)
                 if (err.code === grpc.status.DEADLINE_EXCEEDED) {
-                    console.error("gRPC Timeout:", err.code, err.message);
+                    logger.error(
+                        { requestId: req.requestId, err: err.code, message: err.message },
+                        "gRPC Timeout:"
+                    );
 
                     // Return 503 → downstream service unavailable / too slow
                     return res.status(503).json({
@@ -45,13 +54,22 @@ const userController = (req, res) => {
                 }
 
                 // Any other gRPC error (e.g. UNAVAILABLE, INTERNAL)
-                console.error("gRPC Error:", err.code, err.message);
+                logger.error(
+                    { requestId: req.requestId, err: err.code, message: err.message },
+                    "gRPC Error:"
+                );
 
                 // Return 500 → generic failure
                 return res.status(500).json({
                     error: "Failed to process request at this moment",
                 });
             }
+
+
+            logger.info(
+                { requestId: req.requestId },
+                "User Request Success"
+            );
 
             // 7. Success → send response back to client
             res.json(response);

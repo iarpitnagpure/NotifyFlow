@@ -9,6 +9,7 @@ const logger = pino({
         target: "pino-pretty",             // format logs for human-readable output (dev only)
         options: {
             colorize: true,                // adds colors for better readability in terminal
+            singleLine: true,              // add logs in single line
         },
     },
 });

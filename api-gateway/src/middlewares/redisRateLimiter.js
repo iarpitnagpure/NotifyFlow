@@ -20,6 +20,7 @@
 // 👉 Key idea:
 // Count requests per user within a fixed time window
 
+import logger from "../config/logger.js";
 import redisClient from "../config/redis.js";
 
 const REQUEST_LIMIT = 5;                    // Max allowed requests per window
@@ -54,7 +55,7 @@ const redisRateLimiter = async (req, res, next) => {
         next();
     } catch (err) {
         // If Redis fails, log error
-        console.error(err);
+        logger.error({ err }, "Redis fails:");
 
         // Fail-open strategy:
         // Allow request instead of blocking system

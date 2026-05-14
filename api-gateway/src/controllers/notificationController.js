@@ -1,10 +1,16 @@
 import grpc from "@grpc/grpc-js";
 // import notificationGrpcClient from "../services/notificationGrpcClient.js";
 import notificationQueue from "../queue/notificationQueue.js";
+import logger from "../config/logger.js";
 
 export const notificationController = async (req, res) => {
     // 1. Extract request payload from client
     const { userId, type, message } = req.body;
+
+    logger.info(
+        { requestId: req.requestId, userId, type },
+        "Received notification request"
+    );
 
     // 2. Basic validation (reject bad requests early)
     if (!userId || !type || !message) {
@@ -18,6 +24,11 @@ export const notificationController = async (req, res) => {
     // - Suitable for background tasks (notifications, emails, etc.)
     // - Improves scalability and reliability
     try {
+        logger.info(
+            { requestId: req.requestId, userId },
+            "Queuing notification job"
+        );
+
         // 3. Push job to queue (async processing)
         const job = await notificationQueue.add(
             "send_notification",
@@ -31,6 +42,11 @@ export const notificationController = async (req, res) => {
             }
         );
 
+        logger.info(
+            { requestId: req.requestId, jobId: job.id },
+            "Notification job queued"
+        );
+
         // 4. Return immediate response (do not wait for processing)
         res.json({
             status: "queued",
@@ -38,7 +54,10 @@ export const notificationController = async (req, res) => {
         });
     } catch (err) {
         // 5. Queue failure (rare but possible)
-        console.error("Queue Error:", err);
+        logger.error(
+            { requestId: req.requestId, err },
+            "Failed to queue notification"
+        );
 
         return res.status(500).json({
             error: "Failed to queue notification",
@@ -69,7 +88,10 @@ export const notificationController = async (req, res) => {
 
     //             // Deadline exceeded → service is slow (did not respond in time)
     //             if (err.code === grpc.status.DEADLINE_EXCEEDED) {
-    //                 console.error("gRPC Timeout:", err.code, err.message);
+    //                   logger.error(
+    //                       { requestId: req.requestId, err: err.code, message: err.message },
+    //                   "gRPC Timeout:"
+    //                   );
 
     //                 // Return 503 → downstream service unavailable / too slow
     //                 return res.status(503).json({
@@ -78,7 +100,10 @@ export const notificationController = async (req, res) => {
     //             }
 
     //             // Any other gRPC error (e.g. UNAVAILABLE, INTERNAL)
-    //             console.error("gRPC Error:", err.code, err.message);
+    //             logger.error(
+    //                 { requestId: req.requestId, err: err.code, message: err.message },
+    //                 "gRPC Error:"
+    //             );
 
     //             // Return 500 → generic failure
     //             return res.status(500).json({
