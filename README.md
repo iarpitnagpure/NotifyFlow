@@ -62,7 +62,6 @@ NotifyFlow/
 ├── proto/
 │   ├── notification.proto                     # Notification service schema
 │   └── user.proto                             # User service schema
-├── package.json
 └── README.md
 ├── proto/
 │   ├── notification.proto (Notification service contract)
