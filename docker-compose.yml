@@ -1,0 +1,69 @@
+version: "3.9"  # Compose file version
+
+services:
+  # 🧠 Redis → used for caching + BullMQ queue
+  redis:
+    image: redis:7-alpine         # lightweight official Redis image
+    ports:
+      - "6379:6379"               # expose Redis to host (optional, mainly for local debugging)
+
+  # 🚪 API Gateway → entry point for all client requests
+  api-gateway:
+    build:
+      context: .                  # root context (needed to access proto folder)
+      dockerfile: ./api-gateway/Dockerfile
+    ports:
+      - "4000:4000"               # host:container (API runs on 4000 inside container)
+    env_file:
+      - ./api-gateway/.env        # environment variables
+    volumes:
+      - ./api-gateway:/app        # mount source code for hot reload
+      - ./proto:/app/proto        # shared proto files for gRPC
+      - /app/node_modules         # prevent node_modules overwrite
+    depends_on:
+      - redis
+      - user-service
+      - notification-service      # ensures services start before gateway
+
+  # 👤 User Service → gRPC service for user-related operations
+  user-service:
+    build:
+      context: .
+      dockerfile: ./user-service/Dockerfile
+    ports:
+      - "50052:50052"             # gRPC port
+    env_file:
+      - ./user-service/.env
+    volumes:
+      - ./user-service:/app
+      - ./proto:/app/proto
+      - /app/node_modules
+
+  # 🔔 Notification Service → gRPC service to handle notifications
+  notification-service:
+    build:
+      context: .
+      dockerfile: ./notification-service/Dockerfile
+    ports:
+      - "50051:50051"             # gRPC port
+    env_file:
+      - ./notification-service/.env
+    volumes:
+      - ./notification-service:/app
+      - ./proto:/app/proto
+      - /app/node_modules
+
+  # ⚙️ Notification Worker → background processor (BullMQ consumer)
+  notification-worker:
+    build:
+      context: .
+      dockerfile: ./notification-worker/Dockerfile
+    env_file:
+      - ./notification-worker/.env
+    volumes:
+      - ./notification-worker:/app
+      - ./proto:/app/proto
+      - /app/node_modules
+    depends_on:
+      - redis                       # needs Redis for queue
+      - notification-service        # calls notification service via gRPC

@@ -4,18 +4,48 @@ A scalable, rate-limited notification system built using Node.js, Redis, and gRP
 
 ---
 
-## ✅ Implemented Features
+## 🔧 Implemented Features
 
-* **API Gateway** - Express.js REST API with request routing
-* **Health Check Endpoints** - Service health monitoring
-* **Notification Sending** - Async job queue (BullMQ) for non-blocking notification processing
-* **Notification Status Tracking** - Real-time job status monitoring
-* **User Lookup** - gRPC-based user management service
-* **Rate Limiting** - Redis-based request throttling middleware
-* **Idempotency** - Duplicate request prevention with Redis caching
-* **Request ID Tracking** - Correlation IDs for request logging
-* **Notification Worker** - Background job processor for async task handling
-* **gRPC Services** - Service-to-service communication (Notification & User services)
+* ✅ **Express API Gateway** on port 3000
+* ✅ **Health check endpoint** (`GET /api/health`)
+* ✅ **Notification endpoint** (`POST /api/notify`) - Enqueue async jobs
+* ✅ **Job Status endpoint** (`GET /api/notify/status/:notificationId`) - Poll job progress
+  - Track job state: waiting, active, completed, failed
+  - Returns job result on success
+  - Returns error details on failure
+  - 404 for non-existent job IDs
+* ✅ **User endpoint** (`GET /api/user/:userId`) - Lookup user information
+  - Returns user details: email, phone, preferred channel
+  - 404 for non-existent users
+* ✅ **Idempotency Middleware** - Prevents duplicate request processing using `Idempotency-Key` header
+  - Caches responses for 5 minutes (configurable)
+  - Atomic request locking to prevent race conditions
+  - Response stored in Redis for automatic replay
+* ✅ **Rate Limiting Middleware** - Throttles requests using Redis
+  - Configurable per-user or per-IP limiting
+  - 5 requests per 60-second window (configurable)
+  - Atomic counter operations for distributed safety
+* ✅ **Request ID Tracking** - Correlation IDs for request logging
+* ✅ **Async Job Queue** using BullMQ
+  - Enqueue notification jobs from API Gateway
+  - Non-blocking request/response (returns 202 Accepted)
+  - Improves API responsiveness and scalability
+* ✅ **Notification Worker** - Async job processor
+  - Listens to BullMQ queue for notification jobs
+  - Automatic retry with exponential backoff (3 attempts)
+  - gRPC deadline enforcement (2-second timeout)
+  - Error handling and graceful job failure
+  - Graceful fallback if Redis is unavailable
+* ✅ **gRPC Error Handling** in Worker
+  - Deadline exceeded (timeout) → logs and retries
+  - Connection failures → logs and retries
+  - Max retry attempts with exponential backoff
+* ✅ **gRPC service definitions** with proto files
+* ✅ **gRPC Notification Service** implementation on port 50051
+* ✅ **gRPC User Service** implementation on port 50052
+* ✅ **CORS support** for cross-origin requests
+* ✅ **Environment variable configuration** via `.env` files
+* ✅ **Docker Containerization** - Multi-container setup with Docker Compose for all services
 
 ---
 
@@ -62,52 +92,151 @@ NotifyFlow/
 ├── proto/
 │   ├── notification.proto                     # Notification service schema
 │   └── user.proto                             # User service schema
+├── docker-compose.yml                         # Docker Compose orchestration
 ├── .gitignore
 └── README.md
 ```
 
 ---
 
-## 🔧 Implemented Features
+## 🚀 Getting Started
 
-* ✅ **Express API Gateway** on port 3000
-* ✅ **Health check endpoint** (`GET /api/health`)
-* ✅ **Notification endpoint** (`POST /api/notify`) - Enqueue async jobs
-* ✅ **Job Status endpoint** (`GET /api/notify/status/:notificationId`) - Poll job progress
-  - Track job state: waiting, active, completed, failed
-  - Returns job result on success
-  - Returns error details on failure
-  - 404 for non-existent job IDs
-* ✅ **User endpoint** (`GET /api/user/:userId`) - Lookup user information
-  - Returns user details: email, phone, preferred channel
-  - 404 for non-existent users
-* ✅ **Idempotency Middleware** - Prevents duplicate request processing using `Idempotency-Key` header
-  - Caches responses for 5 minutes (configurable)
-  - Atomic request locking to prevent race conditions
-  - Response stored in Redis for automatic replay
-* ✅ **Rate Limiting Middleware** - Throttles requests using Redis
-  - Configurable per-user or per-IP limiting
-  - 5 requests per 60-second window (configurable)
-  - Atomic counter operations for distributed safety
-* ✅ **Async Job Queue** using BullMQ
-  - Enqueue notification jobs from API Gateway
-  - Non-blocking request/response (returns 202 Accepted)
-  - Improves API responsiveness and scalability
-* ✅ **Notification Worker** - Async job processor
-  - Listens to BullMQ queue for notification jobs
-  - Automatic retry with exponential backoff (3 attempts)
-  - gRPC deadline enforcement (2-second timeout)
-  - Error handling and graceful job failure
-  - Graceful fallback if Redis is unavailable
-* ✅ **gRPC Error Handling** in Worker
-  - Deadline exceeded (timeout) → logs and retries
-  - Connection failures → logs and retries
-  - Max retry attempts with exponential backoff
-* ✅ **gRPC service definitions** with proto files
-* ✅ **gRPC Notification Service** implementation on port 50051
-* ✅ **gRPC User Service** implementation on port 50052
-* ✅ **CORS support** for cross-origin requests
-* ✅ **Environment variable configuration** via `.env` files
+### Option 1: Docker (Recommended)
+
+**Prerequisites:**
+- Docker & Docker Compose installed
+
+**Environment Variables:**
+
+Docker automatically loads `.env` files for each service via `env_file` in `docker-compose.yml`:
+
+**api-gateway/.env**
+```
+APP_PORT=3000
+GRPC_HOST=notification-service
+GRPC_PORT=50051
+USER_SERVICE_GRPC_HOST=user-service
+USER_SERVICE_GRPC_PORT=50052
+REDIS_HOST=redis
+REDIS_PORT=6379
+```
+
+**user-service/.env**
+```
+USER_SERVICE_GRPC_HOST=0.0.0.0
+USER_SERVICE_GRPC_PORT=50052
+```
+
+**notification-service/.env**
+```
+GRPC_HOST=0.0.0.0
+GRPC_PORT=50051
+```
+
+**notification-worker/.env**
+```
+GRPC_HOST=notification-service
+GRPC_PORT=50051
+NOTIFICATION_WORKER_HOST=redis
+NOTIFICATION_WORKER_PORT=6379
+```
+
+**Steps:**
+```bash
+# Build and start all services
+docker-compose up --build
+
+# Services will be available at:
+# - API Gateway: http://localhost:4000
+# - Redis: localhost:6379
+# - User Service (gRPC): localhost:50052
+# - Notification Service (gRPC): localhost:50051
+```
+
+### Option 2: Manual Setup
+
+**Prerequisites:**
+- Node.js 18+
+- Redis running locally (or update `.env` files with Redis connection)
+
+**Environment Variables:**
+
+Create `.env` files in each service directory:
+
+**api-gateway/.env**
+```
+APP_PORT=3000
+GRPC_HOST=localhost
+GRPC_PORT=50051
+USER_SERVICE_GRPC_HOST=localhost
+USER_SERVICE_GRPC_PORT=50052
+REDIS_HOST=localhost
+REDIS_PORT=6379
+```
+
+**user-service/.env**
+```
+USER_SERVICE_GRPC_HOST=0.0.0.0
+USER_SERVICE_GRPC_PORT=50052
+```
+
+**notification-service/.env**
+```
+GRPC_HOST=0.0.0.0
+GRPC_PORT=50051
+```
+
+**notification-worker/.env**
+```
+GRPC_HOST=localhost
+GRPC_PORT=50051
+NOTIFICATION_WORKER_HOST=localhost
+NOTIFICATION_WORKER_PORT=6379
+```
+
+**Steps:**
+
+1. **Install dependencies for all services:**
+   ```bash
+   npm install
+   cd api-gateway && npm install && cd ..
+   cd user-service && npm install && cd ..
+   cd notification-service && npm install && cd ..
+   cd notification-worker && npm install && cd ..
+   ```
+
+2. **Start Redis:**
+   ```bash
+   redis-server
+   ```
+
+3. **Start services in separate terminals:**
+
+   **Terminal 1 - API Gateway:**
+   ```bash
+   cd api-gateway
+   npm run dev
+   ```
+
+   **Terminal 2 - User Service:**
+   ```bash
+   cd user-service
+   npm run dev
+   ```
+
+   **Terminal 3 - Notification Service:**
+   ```bash
+   cd notification-service
+   npm run dev
+   ```
+
+   **Terminal 4 - Notification Worker:**
+   ```bash
+   cd notification-worker
+   npm start
+   ```
+
+4. **API Gateway available at:** `http://localhost:3000`
 
 ---
 
@@ -324,116 +453,6 @@ The notification endpoint processes requests through the following middleware ch
    - Logs notification details
    - Returns response to controller
 
----
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-* Node.js (v18+)
-* Redis (running locally or via Docker)
-
----
-
-### Installation
-
-1. Clone the repository
-2. Install dependencies for each service:
-
-```bash
-# API Gateway
-cd api-gateway
-npm install
-
-# User Service
-cd ../user-service
-npm install
-
-# Notification Service
-cd ../notification-service
-npm install
-
-# Notification Worker
-cd ../notification-worker
-npm install
-```
-
----
-
-### Environment Variables
-
-Create `.env` files in all services:
-
-**api-gateway/.env**
-```
-APP_PORT=3000
-GRPC_HOST=localhost
-GRPC_PORT=50051
-USER_SERVICE_GRPC_HOST=localhost
-USER_SERVICE_GRPC_PORT=50052
-REDIS_HOST=localhost
-REDIS_PORT=6379
-NOTIFICATION_WORKER_HOST=localhost
-NOTIFICATION_WORKER_PORT=6379
-```
-
-**user-service/.env**
-```
-USER_SERVICE_GRPC_HOST=localhost
-USER_SERVICE_GRPC_PORT=50052
-```
-
-**notification-service/.env**
-```
-GRPC_HOST=localhost
-GRPC_PORT=50051
-```
-
-**notification-worker/.env**
-```
-GRPC_HOST=localhost
-GRPC_PORT=50051
-NOTIFICATION_WORKER_HOST=localhost
-NOTIFICATION_WORKER_PORT=6379
-```
-
----
-
-### Run Services
-
-```bash
-# Terminal 1: Start Redis (if not already running)
-redis-server
-
-# Terminal 2: API Gateway (runs on port 3000)
-cd api-gateway
-npm start
-
-# Terminal 3: User Service (runs on port 50052)
-cd user-service
-npm start
-
-# Terminal 4: Notification Service (runs on port 50051)
-cd notification-service
-npm start
-
-# Terminal 5: Notification Worker (async job processor)
-cd notification-worker
-npm start
-```
-
----
-
-### Services Running At
-
-* API Gateway → http://localhost:3000
-* Redis → localhost:6379
-* gRPC User Service → localhost:50052
-* gRPC Notification Service → localhost:50051
-* Notification Worker → Listens to Redis queue (no exposed port)
-
----
-
 ## 🎯 Learning Objectives
 
 This project demonstrates:
@@ -457,7 +476,6 @@ This project demonstrates:
 * Authentication & Authorization
 * Error handling and retry mechanisms
 * Logging & monitoring
-* Docker containerization
 * Observability (metrics, tracing)
 
 ---

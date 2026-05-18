@@ -14,7 +14,9 @@ const __dirname = path.dirname(__filename);
 
 // Define path to proto file (gRPC contract)
 // This file contains service + message definitions
-const PROTO_PATH = path.join(__dirname, '../proto/user.proto');
+// const PROTO_PATH = path.join(__dirname, '../proto/user.proto');
+// Take path from Docker
+const PROTO_PATH = path.join(process.cwd(), "proto", "user.proto");
 
 // Load proto file (defines service + messages)
 const packageDef = protoLoader.loadSync(PROTO_PATH, {
